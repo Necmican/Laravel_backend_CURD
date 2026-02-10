@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Artisan;
 
 class AuthController extends Controller
 {
@@ -49,6 +50,7 @@ class AuthController extends Controller
     // 2. GİRİŞ YAP (Login)
     public function login(Request $request)
     {
+
         if (!Auth::attempt($request->only('email', 'password'))) {
             return response()->json([
                 'status' => false,
@@ -69,14 +71,39 @@ class AuthController extends Controller
         ], 200);
     }
 
-    // 3. ÇIKIŞ YAP (Logout)
+    // ÇIKIŞ YAP 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $request->user()->tokens()->delete();
 
         return response()->json([
-            'status' => true,
-            'message' => 'Çıkış yapıldı'
-        ]);
+            'message' => 'Tüm cihazlardan çıkış yapıldı.'
+        ], 200);
     }
+
+    public function index()
+    {
+        
+        $users =User::all();
+
+    
+        $data = $users->map(function ($user) {
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                
+                'is_logged_in' => $user->tokens()->exists(),
+                
+                'created_at' => $user->created_at,
+            ];
+        });
+
+        return response()->json([
+            'message' => 'Kullanıcı listesi ve durumları',
+            'data' => $data
+        ], 200);
+    }
+
+
 }

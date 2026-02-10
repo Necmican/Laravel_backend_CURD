@@ -4,113 +4,82 @@ namespace App\Http\Controllers;
 
 use App\Models\Todo;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth; 
+use App\Models\ActivityLog;
 
 class TodoController extends Controller
 {
-    // 1. LİSTELEME (GET /api/todos)
+    
     public function index()
     {
-        $todos = Todo::all();
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Todo listesi',
-            'data' => $todos
-        ], 200);
+        
+        return Todo::where('user_id', Auth::id())->get();
     }
 
-    // 2. EKLEME (POST /api/todos)
-    public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-        ]);
+   
+    
+       public function store(Request $request)
+{
+    
+    $todo = $request->user()->todos()->create([
+        'title' => $request->title,    
+        'completed' => false           
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Doğrulama hatası',
-                'errors' => $validator->errors()
-            ], 422);
+    ActivityLog::create([
+        'user_id' => $request->user()->id,      
+        'action' => 'TODO_CREATED',    
+        'description' => "'{$todo->title}' eklendi.", 
+        
+    ]);
+
+    return response()->json($todo, 201);
+}
+    
+
+    
+    public function update(Request $request, Todo $todo)
+    {
+        
+        if ($todo->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Bu işlem için yetkiniz yok.'], 403);
         }
 
-        $todo = Todo::create($request->all());
+    $oldTitle = $todo->title; 
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Todo oluşturuldu',
-            'data' => $todo
-        ], 201);
+    
+    $todo->update($request->all());
+
+    
+    ActivityLog::create([
+        'user_id' => $request->user()->id,
+        'action' => 'TODO_UPDATED',
+        'description' => "Güncellendi. Eski: {$oldTitle} -> Yeni: {$todo->title}",
+    ]);
+
+    return response()->json($todo);
     }
 
-    // 3. TEK KAYIT GÖSTERME (GET /api/todos/{id})
-    public function show($id)
+    
+    public function destroy(Todo $todo)
     {
-        $todo = Todo::find($id);
-
-        if (!$todo) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Kayıt bulunamadı'
-            ], 404); // Maildeki 404 isteği
+        if ($todo->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Bu işlem için yetkiniz yok.'], 403);
         }
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Kayıt bulundu',
-            'data' => $todo
-        ], 200);
-    }
+    $title = $todo->title;
 
-    // 4. GÜNCELLEME (PUT /api/todos/{id})
-    public function update(Request $request, $id)
-    {
-        $todo = Todo::find($id);
+    $todo->delete();
 
-        if (!$todo) {
-            return response()->json(['status' => false, 'message' => 'Kayıt bulunamadı'], 404);
-        }
+  
+    ActivityLog::create([
+        'user_id' => request()->user()->id,
+        'action' => 'TODO_DELETED',
+    
+        'description' => "'{$title}' silindi.",
+    ]);
 
-        // Validation (Güncellemede title zorunlu olmayabilir ama biz yine de kontrol edelim)
-        $validator = Validator::make($request->all(), [
-            'title' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'is_completed' => 'boolean' // Tamamlandı mı? (true/false)
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Doğrulama hatası',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $todo->update($request->all());
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Todo güncellendi',
-            'data' => $todo
-        ], 200);
-    }
-
-    // 5. SİLME (DELETE /api/todos/{id})
-    public function destroy($id)
-    {
-        $todo = Todo::find($id);
-
-        if (!$todo) {
-            return response()->json(['status' => false, 'message' => 'Kayıt bulunamadı'], 404);
-        }
-
-        $todo->delete();
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Todo silindi'
-        ], 200);
+    
+    return response()->json(['message' => 'Silindi']);
     }
 }

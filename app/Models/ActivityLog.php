@@ -2,20 +2,18 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use HasFactory;
 
-class Todo extends Model
+class ActivityLog extends Model
 {
-    use HasFactory;
-
-   
+    
     protected $fillable = [
-        'title', 
-        'description', 
-        'is_completed',
-        'user_id'
+        'user_id',
+        'action',
+        'description',
     ];
+
     public function user()
     {
         return $this->belongsTo(User::class);
